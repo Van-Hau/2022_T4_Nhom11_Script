@@ -1,4 +1,6 @@
-
+// Sử dụng thread để chạy song song nhiều tiến trình
+// hình chữ nhật đại diện cho công việc và ký hiệu hình thoi đại diện cho cấu trúc rẽ nhánh
+// dựa trên file log để thực hiện thêm dòng dữ liệu mới vào datawarehouse
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -35,7 +37,7 @@ import com.opencsv.exceptions.CsvException;
 public class ScrappingKQXS {
 	//31/3/2012
 	Connection con;
-	final String[]field= {"Tỉnh","Khu vực","Thứ","Ngày","Giải","Kết quả sổ","Giá trị vé"};
+	final String[]field= {"Tỉnh","Khu vực","Thứ","Ngày","Giải","Kết quả sổ","Giá trị vés"};
 	public ScrappingKQXS(){
 		try {
 		Class.forName("com.mysql.cj.jdbc.Driver");	
