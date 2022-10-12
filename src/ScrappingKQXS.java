@@ -37,7 +37,7 @@ import com.opencsv.exceptions.CsvException;
 public class ScrappingKQXS {
 	//31/3/2012
 	Connection con;
-	final String[]field= {"Tỉnh","Khu vực","Thứ","Ngày","Giải","Kết quả sổ","Giá trị vés"};
+	final String[]field= {"Tỉnh","Khu vực","Thứ","Ngày","Giải","Kết quả sổ","Giá trị vé"};
 	public ScrappingKQXS(){
 		try {
 		Class.forName("com.mysql.cj.jdbc.Driver");	
