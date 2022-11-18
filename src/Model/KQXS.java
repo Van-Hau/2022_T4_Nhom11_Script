@@ -1,3 +1,4 @@
+package Model;
 
 public class KQXS {
 	private String id;

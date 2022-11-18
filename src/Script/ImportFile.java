@@ -1,3 +1,4 @@
+package Script;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -24,6 +25,12 @@ import org.apache.commons.net.ftp.FTPReply;
 
 import com.opencsv.exceptions.CsvException;
 
+import Config.Configuration;
+import DB.ControllDB;
+import DB.StagingDB;
+import DB.WarehouseDB;
+import Model.KQXS;
+
 public class ImportFile {
 	Connection con;
 	FTPClient ftpClient;
@@ -47,12 +54,17 @@ public class ImportFile {
 	}
 
 	public void downloadFTPFile(String ftpFilePath, String downloadFilePath) {
+		File downloadFile = new File(downloadFilePath);
+		if(downloadFile.exists()) {
+			System.out.println("File đã tồn tại ");
+			return;
+		}
 		connectFTPServer();
 		System.out.println("File " + ftpFilePath + " đang tải xuống...");
 		OutputStream outputStream = null;
 		boolean success = false;
 		try {
-			File downloadFile = new File(downloadFilePath);
+			
 			outputStream = new BufferedOutputStream(new FileOutputStream(downloadFile));
 			// download file from FTP Server
 			ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
@@ -129,7 +141,9 @@ public class ImportFile {
 	}
 
 	public void loadToStaging() {
+		stagingDB.getLocalInfile();
 		List<String> listFile=controllDB.getListFileNameFromLog();
+		if(listFile.size()==0)return ;
 		for(String fileName:listFile) {
 			String date = fileName.split("_")[2];
 			String idLog= fileName.split("_")[0];
@@ -148,28 +162,59 @@ public class ImportFile {
 				sql = new java.sql.Date(0000, 00, 00);
 			}
 			int idDate = warehouseDB.getIdDate(sql);
-			try {
-				if(stagingDB.saveToStagingHelper(fileNameReal, idDate)) {
-					if(warehouseDB.saveToDatabase(idDate,stagingDB.getAllFromStaging(idDate))) {
-						if(!controllDB.changSaveStatus(idLog))
-						System.out.println("Thay đổi trạng thái thất bại");
-						stagingDB.truncateStaging();
-						
-					}
-					else {
-						System.out.println("Lưu từ staging vào datawarehouse thất bại");
-						
-					}
+
+				if(saveToStagingHelper(fileNameReal, idDate,idLog)) {
+					System.out.println("Quá trình load từ staging vào database thành công");
+					//return true;
 				}
 				else {
-					System.out.println("Load vào staging thấy bại");
+					System.out.println("Load vào staging thất bại");
+					//return false;
 					
 				}
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+
 		}
+		
+	}
+	public boolean saveToStagingHelper(String fileName,int idDate,String idLog) {
+		try {
+			
+			if(stagingDB.saveToStagingHelper(fileName, idDate)) {
+				
+				return saveToDatabase(idDate, stagingDB.getAllFromStaging(), idLog);
+				
+			}
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			
+		}
+		return false;
+	}
+	public boolean saveToDatabase(int idDate,List<KQXS> kqxs,String idLog) {
+		try {
+			stagingDB.truncateStaging();
+			if(warehouseDB.saveToDatabase(idDate,kqxs)){
+				if(!controllDB.changSaveStatus(idLog)) {
+					System.out.println("Thay đổi trạng thái thất bại");
+					return false;
+				}
+				else {
+					System.out.println("Thay đổi trạng thái thành công");
+					
+					return true;
+				}
+			}
+			else {
+				System.out.println("Lưu vào databwarehouse thất bại");
+				return false;
+			}
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return false;
 	}
 
 	public static void main(String[] args) {

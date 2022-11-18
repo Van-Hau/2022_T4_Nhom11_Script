@@ -1,4 +1,6 @@
+package DB;
 
+import java.beans.PropertyVetoException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -11,19 +13,34 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+
+import Config.Configuration;
+import Model.KQXS;
 public class WarehouseDB {
 	private Connection con;
 	private static WarehouseDB instance;
+	private static ComboPooledDataSource cpds = new ComboPooledDataSource();
 	private WarehouseDB(){
-		try {
-			//Configuration.loadConfiguration();
-			Class.forName("com.mysql.cj.jdbc.Driver");	
-			String url= "jdbc:mysql://localhost:3306/"+Configuration.DATABASEDW;
-			con=DriverManager.getConnection(url,Configuration.USER, Configuration.PASS);
-			} catch (ClassNotFoundException | SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+		 try {
+	        	Configuration.loadConfiguration();
+	            cpds.setDriverClass(Configuration.DB_DRIVER);
+	            cpds.setJdbcUrl(Configuration.URL+Configuration.MYSQLHOST+"/"+Configuration.DATABASEDW);
+	            cpds.setUser(Configuration.USER);
+	            cpds.setPassword(Configuration.PASS);
+	            cpds.setMinPoolSize(Configuration.DB_MIN_CONNECTIONS);
+	            cpds.setInitialPoolSize(Configuration.DB_MIN_CONNECTIONS);
+	            cpds.setMaxPoolSize(Configuration.DB_MAX_CONNECTIONS);
+	            try {
+					con=cpds.getConnection();
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					System.out.println("Lỗi kết nối");
+				}
+	        } catch (PropertyVetoException e) {
+	            e.printStackTrace();
+	        }
 	}
 	public static WarehouseDB getInstance() {
 		if(instance==null) instance=new WarehouseDB();
@@ -32,7 +49,7 @@ public class WarehouseDB {
 	public int getIdDate(java.sql.Date date) {
 		int id = -1;
 		try {
-			PreparedStatement ps = con.prepareStatement("select id from date_dim WHERE date=?");
+			PreparedStatement ps = con.prepareStatement(Configuration.GET_DATE);
 			ps.setDate(1, date);
 			ResultSet rs = ps.executeQuery();
 
@@ -50,7 +67,7 @@ public class WarehouseDB {
 		long start = System.currentTimeMillis();
 		try {
 			PreparedStatement ps = con.prepareStatement(
-					"insert into data(ID,Province,Area,Date,Award,Number_result,value,isDelete,Date_expire) values(?,?,?,?,?,?,?,?,?)");
+					Configuration.SAVE_DATA);
 			ps.setString(1, id);
 			ps.setInt(2, tinh);
 			ps.setInt(3, khuVuc);
@@ -61,6 +78,9 @@ public class WarehouseDB {
 			ps.setInt(8, 0);
 			ps.setInt(9, dateExpire);
 			int affect = ps.executeUpdate();
+			long end = System.currentTimeMillis();
+			System.out.println("Save to DatabaseHelper took " + (end - start) + "s");
+
 			if (affect > 0) {
 				return true;
 				
@@ -69,9 +89,7 @@ public class WarehouseDB {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		long end = System.currentTimeMillis();
-		System.out.println("Save to DatabaseHelper took " + (end - start) / 1000 + "s");
-
+		
 		return false;
 	}
 //	public void createGiai() {
@@ -96,11 +114,13 @@ public class WarehouseDB {
 //		}
 //	}
 	public int getIdArea(String area) {
+		//System.out.println("Khu vuc la "+area);
 		try {
-			PreparedStatement ps = con.prepareStatement("select * from khu_vuc");
+			PreparedStatement ps = con.prepareStatement(Configuration.GETS_AREA);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next()) {
 				if (rs.getString(2).compareTo(area) == 0) {
+					//System.out.println("Khu vuc "+rs.getInt(1));
 					return rs.getInt(1);
 				}
 			}
@@ -113,13 +133,13 @@ public class WarehouseDB {
 		return -1;
 	}
 	public int getIdAward(String award) {
+		//System.out.println("giai la "+award);
 		try {
-			PreparedStatement ps = con.prepareStatement("select * from giai");
+			PreparedStatement ps = con.prepareStatement(Configuration.GET_AWARD);
+			ps.setString(1, award);
 			ResultSet rs = ps.executeQuery();
-			while (rs.next()) {
-				if (rs.getString(2).compareTo(award) == 0) {
-					return rs.getInt(1);
-				}
+			if (rs.next()) {
+					return rs.getInt(1);						
 			}
 			ps.close();
 		} catch (SQLException e) {
@@ -130,15 +150,17 @@ public class WarehouseDB {
 		return -1;
 	}
 	public int getIdProvince(String tinh) {
+		//System.out.println("tinh la "+tinh);
 		try {
-			PreparedStatement ps = con.prepareStatement("select * from tinh_thanh");
+			PreparedStatement ps = con.prepareStatement(Configuration.GET_PROVINCE);
+			ps.setString(1, tinh);
 			ResultSet rs = ps.executeQuery();
 
-			while (rs.next()) {
-
-				if (rs.getString(2).compareTo(tinh) == 0) {
+			if (rs.next()) {
+				
+				
 					return rs.getInt(1);
-				}
+				
 			}
 			ps.close();
 
@@ -150,10 +172,12 @@ public class WarehouseDB {
 		return -1;
 
 	}
-	public boolean saveToDatabase(int idDate,List<KQXS> listKQXS) throws SQLException {
+	public boolean saveToDatabase(int idDate,List<KQXS> listKQXS){
 		long start = System.currentTimeMillis();
+		int affect=0;
+		System.out.println("staging length "+listKQXS.size());
 		for(KQXS kqxs:listKQXS) {
-			System.out.println(kqxs);
+			long start1 = System.currentTimeMillis();
 			int province = getIdProvince(kqxs.getProvince());
 			if (province == -1) {
 				System.out.println("Khong tim thay id cua tinh " + kqxs.getProvince());
@@ -176,60 +200,57 @@ public class WarehouseDB {
 			try {
 				parsed = format.parse(kqxs.getDateExpire());
 				sql = new java.sql.Date(parsed.getTime());
-				System.out.println("SQL"+sql);
+				
 			} catch (ParseException e) {
 				// TODO Auto-generated catch block
 				sql = new java.sql.Date(0000, 00, 00);
 			}
 			int idDateExpire=getIdDate(sql);
-			long end = System.currentTimeMillis();
-//			System.out.println("Save to Database took " + (end - start) + "s");
-//			System.out.println(province+"-"+kqxs.getProvince());
-//			System.out.println(area+"-"+kqxs.getArea());
-//			System.out.println(idDate+"-"+kqxs.getDate());
-//			System.out.println(award+"-"+kqxs.getAward());
-//			System.out.println(numberResult+"-"+kqxs.getNumberResult());
-//			System.out.println(value+"-"+kqxs.getValue());
-//			System.out.println(idDateExpire+"-"+kqxs.getDateExpire());
-			return saveToDatabaseHelper(UUID.randomUUID().toString(),province, area, idDate, award, numberResult, value,idDateExpire);
-
-		}
-		return false;
-
-	}
-	public void createDateTable() {
-		String start="2000-01-01";
-		String end="3000-12-30";
-		String[] dates= {"Chủ Nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"};
-//		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-		LocalDate startDate=LocalDate.parse(start);
-		LocalDate endDate=LocalDate.parse(end);
-		int index=1;
-		while(!startDate.isAfter(endDate)) {
-			try {
-				PreparedStatement ps=con.prepareStatement("insert into date_dim(id,date,date_of_week) values(?,?,?)");
-				ps.setInt(1, (index++));
-				System.out.println(index);
-				java.sql.Date dateSQL=java.sql.Date.valueOf(startDate);
-				ps.setDate(2,dateSQL);
-				Calendar c = Calendar.getInstance();
-				c.setTime(dateSQL);
-				int dayOfWeek = c.get(Calendar.DAY_OF_WEEK);
-				// 1-Chủ nhật, 2-Thứ Hai, 3-Thứ Ba, 4- Thứ 4, ...
-				ps.setString(3, dates[dayOfWeek-1]);
-				ps.executeUpdate();
-				startDate=startDate.plusDays(1);
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-			System.out.println("Lỗi SQL");
-			e.printStackTrace();
-			}
 			
+			if(saveToDatabaseHelper(UUID.randomUUID().toString(),province, area, idDate, award, numberResult, value,idDateExpire)) {
+				affect++;
+			}
+			long end1 = System.currentTimeMillis();
+			System.out.println("Handle That took "+(end1-start1)+"s");
+
 		}
-	
+		long end = System.currentTimeMillis();
+		System.out.println("saveToDatabase That took "+(end-start)/1000+"s");
+		if(affect>0) return true;
+		else return false;
+		
+
 	}
-	public static void main(String[] args) {
-//		WarehouseDB j=WarehouseDB.getInstance();
-//		j.createGiai();
-	}
+//	public void createDateTable() {
+//		String start="2000-01-01";
+//		String end="3000-12-30";
+//		String[] dates= {"Chủ Nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"};
+////		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+//		LocalDate startDate=LocalDate.parse(start);
+//		LocalDate endDate=LocalDate.parse(end);
+//		int index=1;
+//		while(!startDate.isAfter(endDate)) {
+//			try {
+//				PreparedStatement ps=con.prepareStatement("insert into date_dim(id,date,date_of_week) values(?,?,?)");
+//				ps.setInt(1, (index++));
+//				System.out.println(index);
+//				java.sql.Date dateSQL=java.sql.Date.valueOf(startDate);
+//				ps.setDate(2,dateSQL);
+//				Calendar c = Calendar.getInstance();
+//				c.setTime(dateSQL);
+//				int dayOfWeek = c.get(Calendar.DAY_OF_WEEK);
+//				// 1-Chủ nhật, 2-Thứ Hai, 3-Thứ Ba, 4- Thứ 4, ...
+//				ps.setString(3, dates[dayOfWeek-1]);
+//				ps.executeUpdate();
+//				startDate=startDate.plusDays(1);
+//			} catch (SQLException e) {
+//				// TODO Auto-generated catch block
+//			System.out.println("Lỗi SQL");
+//			e.printStackTrace();
+//			}
+//			
+//		}
+//	
+//	}
+
 }

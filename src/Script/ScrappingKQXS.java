@@ -1,3 +1,4 @@
+package Script;
 // Sử dụng thread để chạy song song nhiều tiến trình
 // hình chữ nhật đại diện cho công việc và ký hiệu hình thoi đại diện cho cấu trúc rẽ nhánh
 // dựa trên file log để thực hiện lấy dữ liệu vào file csv,trạng thái er(hợp lệ) hoặc es(thiếuhỏng) thì kết thúc
@@ -41,6 +42,9 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvException;
 
+import Config.Configuration;
+import DB.ControllDB;
+
 public class ScrappingKQXS {
 	//31/3/2012
 	 FTPClient ftpClient;
@@ -58,7 +62,6 @@ public class ScrappingKQXS {
 		
 	}
 	public void writeCSV(List<String[]> listKQXS,String date, String path,String area) {
-	
 		try {		
 			String filePath=path+area+"_" +date+".csv";
 			File file = new File(filePath);
@@ -69,15 +72,16 @@ public class ScrappingKQXS {
 			csv.flush();
 			csv.close();
             InputStream inputStream = new FileInputStream(file);
-            boolean done = ftpClient.storeFile(Configuration.VITUAL_PATH+"/"+file.getName(), inputStream);
-            inputStream.close();
-            if (done) {
-                System.out.println("Upload thành công");
-            }
-            else {
-            	System.out.println("Upload thất bại");
-            }
-			
+            synchronized (ftpClient) {
+            	 boolean done = ftpClient.storeFile(Configuration.VITUAL_PATH+"/"+file.getName(), inputStream);
+                 inputStream.close();
+                 if (done) {
+                     System.out.println("Upload "+area+" thành công");
+                 }
+                 else {
+                 	System.out.println("Upload thất bại");
+                 }	
+			}		
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.out.println("Không tìm thấy file");
@@ -191,8 +195,9 @@ public class ScrappingKQXS {
 				
 					}
 				}
-				writeCSV(result,date, Configuration.PATH,area);
+				
 				}
+				writeCSV(result,date, Configuration.PATH,area);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -255,42 +260,84 @@ public class ScrappingKQXS {
 			e.printStackTrace();
 		}
 	}
-public  void getData(String date) throws IOException {
-	if(Configuration.isExits==0) {
-		System.out.println("Không tồn tại file Config");
-		return;
-	}
-//	 if(!connectFTPServer()) return;
-	// Lấy danh sách dữ liệu kết quả xổ số miền nam
-	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
+public void getData(String date){
+//	if(Configuration.isExits==0) {
+//		System.out.println("Không tồn tại file Config");
+//		return;
+//	}
+//	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
+//	try {
+//		scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
+//	} catch (IOException e) {
+//		// TODO Auto-generated catch block
+//		e.printStackTrace();
+//	}
+//	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
+	 if(!ftpClient.isConnected()) {
+		 if(!connectFTPServer()) return;
+	 }
+	 //Lấy danh sách dữ liệu kết quả xổ số miền nam
+	Thread t1 = new Thread() {
+        public void run() {
+        	//System.out.println(this.getName());
+        	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
+        }
+    };
 	// Do khác định dạng nên định nghĩa phương thức hơi khác với miền trung và miền nam
 	// Lấy danh sách dữ liệu kết quả xổ số miền bắc
-	scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
-	// Lấy danh sách dữ liệu kết quả xổ số miền trung
-	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
-//	disconnectFTPServer();
+	Thread t2 = new Thread() {
+        public void run() {
+        	try {
+        		//System.out.println(this.getName());
+				scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+        }
+    };
+ // Lấy danh sách dữ liệu kết quả xổ số miền trung
+	Thread t3 = new Thread() {
+        public void run() {
+        	//System.out.println(this.getName());
+        	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
+        }
+    };
+    t1.start();
+    t2.start();
+    t3.start();
+    try {
+    	t1.join();
+        t2.join();
+        t3.join();
+    } catch (Exception e) {
+        System.out.println(e);
+    }
+
+
+//
+//    try {
+//        t3.join();
+//    } catch (Exception e) {
+//        System.out.println(e);
+//    }
+
 }
 public void getMultiDay() {
 	long start=System.currentTimeMillis();
-	 if(!connectFTPServer()) return;
+	if(!connectFTPServer()) return;
 	if(Configuration.isExits==0) {
 		System.out.println("Không tồn tại file Config");
 		return;
 	}
-	List<String> dates=getListDate("2012-01-01", "2013-01-01");
+	List<String> dates=getListDate("2012-01-10", "2012-01-11");
 	if(dates.size()==0) {
 		System.out.println("Start date have to more than End date !");
 		return ;
 	}
-
 	for(String date:dates) {
-		try {
-			System.out.println(date);
-			getData(date);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		System.out.println(date);
+		getData(date);
 	}
 	disconnectFTPServer();
 	long end=System.currentTimeMillis();
@@ -309,23 +356,17 @@ public void setSchedule() {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
-            	try {
-            		
-            		SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
-            		Date date = java.sql.Date.valueOf(LocalDate.now());	
-            		
-					getData(format.format(date));
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+            	SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
+				Date date = java.sql.Date.valueOf(LocalDate.now());	
+				
+				getData(format.format(date));
             }
         };
 
         Timer timer = new Timer();
         timer.schedule(timerTask, dateSchedule, period);
 	}
-
+//29
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException, CsvException, ParseException {
 		ScrappingKQXS sm = new ScrappingKQXS();
 		sm.getMultiDay();

@@ -1,3 +1,4 @@
+package Model;
 
 public class Data {
 	private String id;

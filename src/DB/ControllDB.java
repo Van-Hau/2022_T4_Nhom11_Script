@@ -1,4 +1,6 @@
+package DB;
 
+import java.beans.PropertyVetoException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -12,19 +14,33 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+
+import Config.Configuration;
+
 public class ControllDB {
 	private Connection con;
 	private static ControllDB instance;
+	private static ComboPooledDataSource cpds = new ComboPooledDataSource();
 	private ControllDB(){
 		try {
-			//Configuration.loadConfiguration();
-			Class.forName("com.mysql.cj.jdbc.Driver");	
-			String url= "jdbc:mysql://localhost:3306/"+Configuration.DATABASECT;
-			con=DriverManager.getConnection(url,Configuration.USER, Configuration.PASS);
-			} catch (ClassNotFoundException | SQLException e) {
+        	Configuration.loadConfiguration();
+            cpds.setDriverClass(Configuration.DB_DRIVER);
+            cpds.setJdbcUrl(Configuration.URL+Configuration.MYSQLHOST+"/"+Configuration.DATABASECT);
+            cpds.setUser(Configuration.USER);
+            cpds.setPassword(Configuration.PASS);
+            cpds.setMinPoolSize(Configuration.DB_MIN_CONNECTIONS);
+            cpds.setInitialPoolSize(Configuration.DB_MIN_CONNECTIONS);
+            cpds.setMaxPoolSize(Configuration.DB_MAX_CONNECTIONS);
+            try {
+				con=cpds.getConnection();
+			} catch (SQLException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.out.println("Lỗi kết nối");
 			}
+        } catch (PropertyVetoException e) {
+            e.printStackTrace();
+        }
 	}
 	public static ControllDB getInstance() {
 		if(instance==null) instance=new ControllDB();
@@ -32,7 +48,7 @@ public class ControllDB {
 	}
 	public int checkLog(String fileName) {
 		try {
-			PreparedStatement ps=con.prepareStatement("select * from log where log.ID_Config=? and log.File_Name=?");
+			PreparedStatement ps=con.prepareStatement(Configuration.CHECK_LOG_CONTAIN);
 			ps.setString(1, Configuration.getID(con));
 			ps.setString(2, fileName);
 			ResultSet rs=ps.executeQuery();
@@ -50,7 +66,7 @@ public class ControllDB {
 		List<String> result=new ArrayList<String>();
 		try {
 
-			PreparedStatement ps = con.prepareStatement("select ID,File_Name from log where status=?");
+			PreparedStatement ps = con.prepareStatement(Configuration.GET_LOG_STATUS_1);
 			ps.setInt(1, 1);
 			ResultSet rs = ps.executeQuery();
 			while (rs.next()) {
@@ -71,7 +87,7 @@ public class ControllDB {
 		try {
 			if(checkLog(fileName)!=-1) return ;
 			String id=UUID.randomUUID().toString();
-			PreparedStatement ps=con.prepareStatement("insert into log(ID, ID_Config, File_Name,Time,Status,Contact) values(?,?,?,?,?,?)");
+			PreparedStatement ps=con.prepareStatement(Configuration.SAVE_LOG);
 			ps.setString(1,id);
 			ps.setString(2, Configuration.getID(con));
 			ps.setString(3, fileName);
@@ -89,7 +105,7 @@ public class ControllDB {
 	}
 	public boolean changSaveStatus(String id) {
 		try {
-			PreparedStatement ps = con.prepareStatement("update log set Status=? where ID=?");
+			PreparedStatement ps = con.prepareStatement(Configuration.CHANGE_LOG_TO_2);
 			ps.setInt(1, 2);
 			ps.setString(2, id);
 			int affect = ps.executeUpdate();

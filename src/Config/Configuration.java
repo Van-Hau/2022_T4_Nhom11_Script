@@ -1,3 +1,4 @@
+package Config;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,31 +13,49 @@ import java.util.UUID;
 import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPReply;
 public class Configuration {
-	static String DATABASEDW;
-	static String DATABASEST;
-	static String DATABASECT;
-	static String USER;
-	static String PASS;
-	static String PATH;
-	static int HOUR,MINUTE,SECOND;
-	static String FTP;
-	static String SOURCE_NAME;
-	static String CONTACT;
+	public static String DATABASEDW;
+	public static String DATABASEST;
+	public static String DATABASECT;
+	public static String MYSQLHOST;
+	public static String USER;
+	public static String PASS;
+	public static String PATH;
+	public static int HOUR,MINUTE,SECOND;
+	public static String FTP;
+	public static String SOURCE_NAME;
+	public static String CONTACT;
 	public static String ID_CONFIG;
-	static String VITUAL_PATH;
+	public static String VITUAL_PATH;
 	// ftp config
-	static String FTP_SERVER_ADDRESS;
-    static int FTP_SERVER_PORT_NUMBER;
-    static int FTP_TIMEOUT;
-    static int BUFFER_SIZE;
-    static String FTP_USERNAME;
-    static  String FTP_PASSWORD;
+	public static String FTP_SERVER_ADDRESS;
+	public static int FTP_SERVER_PORT_NUMBER;
+	public static int FTP_TIMEOUT;
+	public static int BUFFER_SIZE;
+	public static String FTP_USERNAME;
+	public  static  String FTP_PASSWORD;
+    public static  String DB_DRIVER;
+    public static  String URL;
+    public static  int DB_MIN_CONNECTIONS;
+    public static  int DB_MAX_CONNECTIONS;
+    public static  String LOAD_FILE_TO_STAGING;
+    public static  String GETS_KQXS;
+    public static  String TRUNCATE_KQXS;
+    public static  String CHECK_LOG_CONTAIN;
+    public static  String GET_LOG_STATUS_1;
+    public static  String SAVE_LOG;
+    public static  String CHANGE_LOG_TO_2;
+    public static  String GET_DATE;
+    public static  String SAVE_DATA;
+    public static  String GETS_AREA;
+    public static  String GET_AWARD;
+    public static  String GET_PROVINCE;
     FTPClient  ftpClient;
-    static int isExits=1;
+    public static int isExits=1;
     public static void printConfig() {
     	System.out.println("DATABASEDW: "+DATABASEDW);
     	System.out.println("USER: "+USER);
     	System.out.println("PASS: "+PASS);
+    	System.out.println("MYSQLHOST "+MYSQLHOST);
     	System.out.println("PATH: "+PATH);
     	System.out.println("HOUR,MINUTE,SECOND: "+HOUR+","+MINUTE+","+SECOND);
     	System.out.println("FTP: "+FTP);
@@ -49,6 +68,10 @@ public class Configuration {
     	System.out.println("BUFFER_SIZE: "+BUFFER_SIZE);
     	System.out.println("FTP_USERNAME: "+FTP_USERNAME);
     	System.out.println("FTP_PASSWORD: "+ FTP_PASSWORD);
+    	System.out.println("URL: "+ URL);
+    	System.out.println("DB_DRIVER: "+ DB_DRIVER);
+    	System.out.println("DB_MIN_CONNECTIONS: "+ DB_MIN_CONNECTIONS);
+    	System.out.println("DB_MAX_CONNECTIONS: "+ DB_MAX_CONNECTIONS);
     }
     public static boolean loadConfiguration() {
     	Properties properties = new Properties();
@@ -63,6 +86,7 @@ public class Configuration {
             DATABASEDW=properties.getProperty("DATABASEDW");
             DATABASEST=properties.getProperty("DATABASEST");
             DATABASECT=properties.getProperty("DATABASECT");
+            MYSQLHOST=properties.getProperty("MYSQLHOST");
             USER=properties.getProperty("USER");
             PASS=properties.getProperty("PASS");
             PATH=properties.getProperty("PATH");
@@ -80,6 +104,22 @@ public class Configuration {
             BUFFER_SIZE=Integer.parseInt(properties.getProperty("BUFFER_SIZE"));
             FTP_USERNAME=properties.getProperty("FTP_USERNAME");
             FTP_PASSWORD=properties.getProperty("FTP_PASSWORD");
+            DB_MAX_CONNECTIONS=Integer.parseInt(properties.getProperty("DB_MAX_CONNECTIONS"));
+            DB_MIN_CONNECTIONS=Integer.parseInt(properties.getProperty("DB_MIN_CONNECTIONS"));
+            URL=properties.getProperty("URL");
+            DB_DRIVER=properties.getProperty("DB_DRIVER");
+            LOAD_FILE_TO_STAGING=properties.getProperty("LOAD_FILE_TO_STAGING");
+            GETS_KQXS=properties.getProperty("GETS_KQXS");
+            TRUNCATE_KQXS=properties.getProperty("TRUNCATE_KQXS");
+            CHECK_LOG_CONTAIN=properties.getProperty("CHECK_LOG_CONTAIN");
+            GET_LOG_STATUS_1=properties.getProperty("GET_LOG_STATUS_1");
+            SAVE_LOG=properties.getProperty("SAVE_LOG");
+            CHANGE_LOG_TO_2=properties.getProperty("CHANGE_LOG_TO_2");
+            GET_DATE=properties.getProperty("GET_DATE");
+            SAVE_DATA=properties.getProperty("SAVE_DATA");
+            GETS_AREA=properties.getProperty("GETS_AREA");
+            GET_AWARD=properties.getProperty("GET_AWARD");
+            GET_PROVINCE=properties.getProperty("GET_PROVINCE");
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Lỗi gì đó ở đây");
@@ -95,7 +135,7 @@ public class Configuration {
         }
     	return true;
     }
-	static String getID(Connection con) {
+	public static String getID(Connection con) {
 		if(!ID_CONFIG.equals("")) return ID_CONFIG;
 		try {
 			PreparedStatement ps=con.prepareStatement("select ID from config where Source_Name=? AND Source_Local=? AND FTP=? AND user=? AND pass=?");
@@ -106,7 +146,6 @@ public class Configuration {
 			ps.setString(5, PASS);
 			ResultSet rs=ps.executeQuery();
 			if(rs.next()) {
-				System.out.println("da co");
 				ID_CONFIG= rs.getString(1);
 				return ID_CONFIG;
 			}
