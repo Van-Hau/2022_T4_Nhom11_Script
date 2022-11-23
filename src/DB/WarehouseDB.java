@@ -46,25 +46,10 @@ public class WarehouseDB {
 		if(instance==null) instance=new WarehouseDB();
 		return instance;
 	}
-	public int getIdDate(java.sql.Date date) {
-		int id = -1;
-		try {
-			PreparedStatement ps = con.prepareStatement(Configuration.GET_DATE);
-			ps.setDate(1, date);
-			ResultSet rs = ps.executeQuery();
-
-			if (rs.next())
-				id = rs.getInt(1);
-
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return id;
-	}
+	
 	public boolean saveToDatabaseHelper(String id,int tinh, int khuVuc, int ngay, int giai,
 			String ketQuaSo, int giaTri,int dateExpire) {
-		long start = System.currentTimeMillis();
+		//long start = System.currentTimeMillis();
 		try {
 			PreparedStatement ps = con.prepareStatement(
 					Configuration.SAVE_DATA);
@@ -78,8 +63,8 @@ public class WarehouseDB {
 			ps.setInt(8, 0);
 			ps.setInt(9, dateExpire);
 			int affect = ps.executeUpdate();
-			long end = System.currentTimeMillis();
-			System.out.println("Save to DatabaseHelper took " + (end - start) + "s");
+		//	long end = System.currentTimeMillis();
+//			System.out.println("Save to DatabaseHelper took " + (end - start) + "s");
 
 			if (affect > 0) {
 				return true;
@@ -113,16 +98,30 @@ public class WarehouseDB {
 //			e.printStackTrace();
 //		}
 //	}
+	public int getIdDate(java.sql.Date date) {
+		int id = 0;
+		try {
+			PreparedStatement ps = con.prepareStatement(Configuration.GET_DATE);
+			ps.setDate(1, date);
+			ResultSet rs = ps.executeQuery();
+
+			if (rs.next())
+				id = rs.getInt(1);
+
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return id;
+	}
 	public int getIdArea(String area) {
 		//System.out.println("Khu vuc la "+area);
 		try {
 			PreparedStatement ps = con.prepareStatement(Configuration.GETS_AREA);
+			ps.setString(1, area);
 			ResultSet rs = ps.executeQuery();
-			while (rs.next()) {
-				if (rs.getString(2).compareTo(area) == 0) {
-					//System.out.println("Khu vuc "+rs.getInt(1));
+			if (rs.next()) {
 					return rs.getInt(1);
-				}
 			}
 			ps.close();
 		} catch (SQLException e) {
@@ -130,7 +129,7 @@ public class WarehouseDB {
 			e.printStackTrace();
 		}
 		System.out.println("Không thể tìm thấy id khu vực");
-		return -1;
+		return 0;
 	}
 	public int getIdAward(String award) {
 		//System.out.println("giai la "+award);
@@ -147,8 +146,9 @@ public class WarehouseDB {
 			e.printStackTrace();
 		}
 		System.out.println("Không thể tìm thấy id Giải");
-		return -1;
+		return 0;
 	}
+	
 	public int getIdProvince(String tinh) {
 		//System.out.println("tinh la "+tinh);
 		try {
@@ -169,7 +169,7 @@ public class WarehouseDB {
 			e.printStackTrace();
 		}
 		System.out.println("Không thể tìm thấy id tỉnh");
-		return -1;
+		return 0;
 
 	}
 	public boolean saveToDatabase(int idDate,List<KQXS> listKQXS){
@@ -177,12 +177,8 @@ public class WarehouseDB {
 		int affect=0;
 		System.out.println("staging length "+listKQXS.size());
 		for(KQXS kqxs:listKQXS) {
-			long start1 = System.currentTimeMillis();
+			//long start1 = System.currentTimeMillis();
 			int province = getIdProvince(kqxs.getProvince());
-			if (province == -1) {
-				System.out.println("Khong tim thay id cua tinh " + kqxs.getProvince());
-				continue;
-			}
 			int area = getIdArea(kqxs.getArea());
 			int award = getIdAward(kqxs.getAward());
 			String numberResult = kqxs.getNumberResult();
@@ -210,8 +206,8 @@ public class WarehouseDB {
 			if(saveToDatabaseHelper(UUID.randomUUID().toString(),province, area, idDate, award, numberResult, value,idDateExpire)) {
 				affect++;
 			}
-			long end1 = System.currentTimeMillis();
-			System.out.println("Handle That took "+(end1-start1)+"s");
+			//long end1 = System.currentTimeMillis();
+			//System.out.println("Handle That took "+(end1-start1)+"s");
 
 		}
 		long end = System.currentTimeMillis();
@@ -220,6 +216,45 @@ public class WarehouseDB {
 		else return false;
 		
 
+	}
+	public boolean importProvince(int id) {
+		try {
+			PreparedStatement ps=con.prepareStatement(Configuration.IMPORT_PROVINCE_TO_DATAWAREHOUSE);
+			ps.setInt(1, id);
+			int affect=ps.executeUpdate();
+			if(affect>=0) return true;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			return false;
+		}
+		return false;
+		
+	}
+	public boolean importArea(int  id) {
+		try {
+			PreparedStatement ps=con.prepareStatement(Configuration.IMPORT_AREA_TO_DATAWAREHOUSE);
+			ps.setInt(1, id);
+			int affect=ps.executeUpdate();
+			if(affect>=0) return true;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			return false;
+		}
+		return false;
+		
+	}
+	public boolean importAward(int id) {
+		try {
+			PreparedStatement ps=con.prepareStatement(Configuration.IMPORT_AWARD_TO_DATAWAREHOUSE);
+			ps.setInt(1, id);
+			int affect=ps.executeUpdate();
+			if(affect>=0) return true;
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			return false;
+		}
+		return false;
+		
 	}
 //	public void createDateTable() {
 //		String start="2000-01-01";

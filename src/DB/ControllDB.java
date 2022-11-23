@@ -34,6 +34,7 @@ public class ControllDB {
             cpds.setMaxPoolSize(Configuration.DB_MAX_CONNECTIONS);
             try {
 				con=cpds.getConnection();
+			
 			} catch (SQLException e) {
 				// TODO Auto-generated catch block
 				System.out.println("Lỗi kết nối");
@@ -82,11 +83,11 @@ public class ControllDB {
 		}
 		return result;
 	}
-	public void saveLog(Timestamp time, String fileName,int status) {
-		
+	public String saveLog(Timestamp time, String fileName,int status) {
+		String id="";
 		try {
-			if(checkLog(fileName)!=-1) return ;
-			String id=UUID.randomUUID().toString();
+			if(checkLog(fileName)!=-1) return id;
+			id=UUID.randomUUID().toString();
 			PreparedStatement ps=con.prepareStatement(Configuration.SAVE_LOG);
 			ps.setString(1,id);
 			ps.setString(2, Configuration.getID(con));
@@ -97,16 +98,17 @@ public class ControllDB {
 			ps.executeUpdate();
 			ps.close();
 			
+			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+		return id;
 	}
-	public boolean changSaveStatus(String id) {
+	public boolean changSaveStatus(String id,int status) {
 		try {
 			PreparedStatement ps = con.prepareStatement(Configuration.CHANGE_LOG_TO_2);
-			ps.setInt(1, 2);
+			ps.setInt(1, status);
 			ps.setString(2, id);
 			int affect = ps.executeUpdate();
 			return affect > 0 ? true : false;

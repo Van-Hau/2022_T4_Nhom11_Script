@@ -141,7 +141,7 @@ public class ImportFile {
 	}
 
 	public void loadToStaging() {
-		stagingDB.getLocalInfile();
+		
 		List<String> listFile=controllDB.getListFileNameFromLog();
 		if(listFile.size()==0)return ;
 		for(String fileName:listFile) {
@@ -151,16 +151,7 @@ public class ImportFile {
 			System.out.println("Ngày " + date);
 			System.out.println("FILE NAME: "+fileName);
 			downloadFTPFile(Configuration.VITUAL_PATH + "/" + fileNameReal, Configuration.PATH + fileNameReal);
-			Date parsed;
-			java.sql.Date sql;
-			SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
-			try {
-				parsed = format.parse(date);
-				sql = new java.sql.Date(parsed.getTime());
-			} catch (ParseException e) {
-				// TODO Auto-generated catch block
-				sql = new java.sql.Date(0000, 00, 00);
-			}
+			java.sql.Date sql=Configuration.convertDate(date);
 			int idDate = warehouseDB.getIdDate(sql);
 
 				if(saveToStagingHelper(fileNameReal, idDate,idLog)) {
@@ -195,7 +186,7 @@ public class ImportFile {
 		try {
 			stagingDB.truncateStaging();
 			if(warehouseDB.saveToDatabase(idDate,kqxs)){
-				if(!controllDB.changSaveStatus(idLog)) {
+				if(!controllDB.changSaveStatus(idLog,2)) {
 					System.out.println("Thay đổi trạng thái thất bại");
 					return false;
 				}
@@ -215,6 +206,10 @@ public class ImportFile {
 			e.printStackTrace();
 		}
 		return false;
+	}
+	public void updateAreaDimension() {
+		stagingDB.importArea();
+		
 	}
 
 	public static void main(String[] args) {

@@ -44,6 +44,9 @@ import com.opencsv.exceptions.CsvException;
 
 import Config.Configuration;
 import DB.ControllDB;
+import DB.StagingDB;
+import DB.WarehouseDB;
+import Model.Area;
 
 public class ScrappingKQXS {
 	//31/3/2012
@@ -52,16 +55,20 @@ public class ScrappingKQXS {
 //	WarehouseDB warehouseDB;
 //	StagingDB stagingDB;
 	ControllDB controllDB;
+	StagingDB stagingDB;
+	WarehouseDB warehouseDB;
 	public ScrappingKQXS(){
 //		warehouseDB=WarehouseDB.getInstance();
 //		stagingDB=StagingDB.getInstance();
 		Configuration.loadConfiguration();
 		Configuration.printConfig();
 		controllDB=ControllDB.getInstance();
+		warehouseDB=WarehouseDB.getInstance();
+		stagingDB=StagingDB.getInstance();
 		ftpClient=new FTPClient();
 		
 	}
-	public void writeCSV(List<String[]> listKQXS,String date, String path,String area) {
+	public void writeCSV(List<String[]> listKQXS,String date, String path,String area,String idLog) {
 		try {		
 			String filePath=path+area+"_" +date+".csv";
 			File file = new File(filePath);
@@ -71,35 +78,38 @@ public class ScrappingKQXS {
 			csv.writeAll(listKQXS);
 			csv.flush();
 			csv.close();
-            InputStream inputStream = new FileInputStream(file);
-            synchronized (ftpClient) {
+            InputStream inputStream = new FileInputStream(file);    
             	 boolean done = ftpClient.storeFile(Configuration.VITUAL_PATH+"/"+file.getName(), inputStream);
                  inputStream.close();
                  if (done) {
                      System.out.println("Upload "+area+" thành công");
                  }
                  else {
+                	controllDB.changSaveStatus(idLog,0); 
                  	System.out.println("Upload thất bại");
                  }	
-			}		
+					
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			controllDB.changSaveStatus(idLog,0); 
+			e.printStackTrace();
 			System.out.println("Không tìm thấy file");
 		} 	
 
 	}
 
 	public void scrappingMienBac(String url,String date) throws IOException {
-		if(controllDB.checkLog("MB_"+"_"+date+".csv")!=-1) {
+		if(controllDB.checkLog("MB"+"_"+date+".csv")!=-1) {
 			System.out.println("File lỗi hoặc đã lưu vào CSDL");
 			return;
 		}
+		
 		Document doc = null;
 		try {	
 				LocalDateTime now = LocalDateTime.now();
 				Timestamp time = Timestamp.valueOf(now);
 				List<String[]> result = new ArrayList<String[]>();
-				doc = Jsoup.connect(url+ date + ".html").userAgent("Jsoup client").timeout(20000).get();
+				doc = Jsoup.connect(url+ date + ".html").timeout(10 * 1000).userAgent("Jsoup client").timeout(20000).get();
 				String syntax = "#noidung .box_kqxs .content>table>tbody";
 				Elements list = doc.select(syntax);
 				String area="MB";
@@ -107,17 +117,22 @@ public class ScrappingKQXS {
 					controllDB.saveLog(time,area+"_"+date+".csv",0);
 					return;
 				}
-				controllDB.saveLog(time,area+"_"+date+".csv",1);
+				int countAward =stagingDB.importAward();
+				//System.out.println(countAward);
+				int countProvince =stagingDB.importProvince()+1;
+				//System.out.println(countProvince);
+				String idLog=controllDB.saveLog(time,area+"_"+date+".csv",1);
 				// thong tin chung
 				String titleTable=doc.select("#noidung .box_kqxs>.top>.bkl>.bkr>.bkm>.title").html();
-				String province=getProvince(titleTable);				
+				String province=getProvince(titleTable);
+				updateProvinceDimension(province,countProvince);
 				//String dateOfWeek = doc.select("#noidung .box_kqxs>.content>table>tbody>tr:eq(0)>td:eq(0)").html();		
-				String[] listAward = { "Giải bảy", "Giải sáu", "Giải năm", "Giải tư", "Giải ba",
-						"Giải nhì", "Giải nhất", "Giải Đặc Biệt" };
 				String[]values= {"40,000","100,000","200,000","400,000","1,000,000","5,000,000","10,000,000","1,000,000,000"};
 				for (Element e : list) {
 					for (int i = 1; i <= 8; i++) {
-						String award = listAward[(listAward.length-i)];
+						String award = doc.select("#noidung .box_kqxs:eq(1) .content>table>tbody>tr:eq("+i+")>td:eq(0)").get(0).text();
+						//System.out.println(award);
+						if(updateAwardDimension(award,countAward)) countAward ++;
 						String value=values[(values.length-i)];
 						Elements resultTable = e.select("tr:" + "eq(" + i + ")>td:eq(1)>div");
 						for (Element r : resultTable) {
@@ -132,15 +147,50 @@ public class ScrappingKQXS {
 						}
 					}
 				}
-				writeCSV(result,date, Configuration.PATH,area);
+				writeCSV(result,date, Configuration.PATH,area,idLog);
 
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		stagingDB.truncateAward();
+		stagingDB.truncateProvince();
 
 	}
-
+	public boolean updateProvinceDimension(String province,int count) {
+		//insert dữ liệu từ datawarehouse vào staging
+		//stagingDB.importArea();
+		//Lặp lại các phần tử, so sánh nếu giống thì cập nhật lại date update
+		if(stagingDB.getProvince(province)==null) {
+			System.out.println("Chua co");
+			if(stagingDB.insertProvince(province,count)) {
+				return warehouseDB.importProvince(count);
+			}
+			else {	
+				 return false;
+			}
+		}
+		else {
+			return  false;
+		}
+		//chuyển dữ liệu lại sang datawarehouse
+		//warehouseDB.importArea();
+	}
+	public boolean updateAwardDimension(String award,int count) {
+		//insert dữ liệu từ datawarehouse vào staging
+		//stagingDB.importArea();
+		//Lặp lại các phần tử, so sánh nếu giống thì cập nhật lại date update
+		if(stagingDB.getAward(award)==null) {
+			System.out.println("Chua co");
+			if(stagingDB.insertAward(award,count)) {
+				return warehouseDB.importAward(count);
+			}
+			else return false;
+		}
+		else return  false;
+		//chuyển dữ liệu lại sang datawarehouse
+		//warehouseDB.importArea();
+	}
 	public String getProvince(String titleTable) {
 		String [] tokens=titleTable.split("-");
 		String title=tokens[2].trim();
@@ -153,39 +203,43 @@ public class ScrappingKQXS {
 			System.out.println("File lỗi hoặc đã lưu vào CSDL");
 			return;
 		}
+		
+		
 		Document doc = null;
 		try {
 				LocalDateTime now = LocalDateTime.now();
 				Timestamp time = Timestamp.valueOf(now);
 				List<String[]> result = new ArrayList<String[]>();
-				doc = Jsoup.connect(url + date + ".html").userAgent("Jsoup client").timeout(20000).get();
+				doc = Jsoup.connect(url + date + ".html").timeout(10 * 1000).userAgent("Jsoup client").timeout(20000).get();
 				String syntax = "#noidung .box_kqxs:eq(1) .content>table>tbody>tr>td:eq(1)>table>tbody>tr>td";
 				Elements list = doc.select(syntax);
 				if(list.size()==0) {
 					controllDB.saveLog(time,area+"_"+date+".csv",0);
 					return;
 				}
+				int countAward =stagingDB.importAward();
+				int countProvince =stagingDB.importProvince()+1;
 				// thong tin chung
-				controllDB.saveLog(time,area+"_"+date+".csv",1);
+				String idLog=controllDB.saveLog(time,area+"_"+date+".csv",1);
 //				String dateOfWeek = doc.select("#noidung .box_kqxs:eq(1) .content table tbody tr td .leftcl .thu a").html();
-				String[] listAward = { "Giải tám", "Giải bảy", "Giải sáu", "Giải năm", "Giải tư", "Giải ba",
-						"Giải nhì", "Giải nhất", "Giải Đặc Biệt" };
 				int pivot=list.size()-1;
 				if(list.get(list.size()-2).select("table tbody tr:eq(0)>.tinh>a").size()==0) {
 					pivot=pivot-1;
 				}
 				list=doc.select(syntax+":lt("+pivot+")");
 				Elements listValueAward=doc.select("#noidung .box_kqxs:eq(1) .content>table>tbody>tr>td:eq(1)>table>tbody>tr>td:eq("+pivot+")");
-
-				for (Element e : list) {
-					
+				for (Element e : list) {	
 					String province = e.select("table tbody tr:eq(0)>.tinh a").html();
+					updateProvinceDimension(province,countProvince);
 					for (int i = 2; i <= 10; i++) {
-						String award = listAward[i - 2];
+						String award = doc.select("#noidung .box_kqxs:eq(1) .content>table>tbody>tr>td:eq(0)>table>tbody>tr:eq("+i+")").get(0).text();
+						
+						if(updateAwardDimension(award,countAward)) countAward ++;
 						String value=listValueAward.select("tr:eq("+i+")>td").html();					
 						Elements resultTable = e.select("table tbody tr:" + "eq(" + i + ")>td>div");
 						for (Element r : resultTable) {
 							String numberResult=r.html();
+							
 							if(numberResult.isEmpty()) continue;
 							//DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 							DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("dd-MM-yyyy");
@@ -197,11 +251,15 @@ public class ScrappingKQXS {
 				}
 				
 				}
-				writeCSV(result,date, Configuration.PATH,area);
+				writeCSV(result,date, Configuration.PATH,area,idLog);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			stagingDB.truncateAward();
+			stagingDB.truncateProvince();
 			e.printStackTrace();
 		}
+		stagingDB.truncateAward();
+		stagingDB.truncateProvince();
 		
 	}
 
@@ -265,62 +323,18 @@ public void getData(String date){
 //		System.out.println("Không tồn tại file Config");
 //		return;
 //	}
-//	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
-//	try {
-//		scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
-//	} catch (IOException e) {
-//		// TODO Auto-generated catch block
-//		e.printStackTrace();
-//	}
-//	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
 	 if(!ftpClient.isConnected()) {
 		 if(!connectFTPServer()) return;
 	 }
-	 //Lấy danh sách dữ liệu kết quả xổ số miền nam
-	Thread t1 = new Thread() {
-        public void run() {
-        	//System.out.println(this.getName());
-        	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
-        }
-    };
-	// Do khác định dạng nên định nghĩa phương thức hơi khác với miền trung và miền nam
-	// Lấy danh sách dữ liệu kết quả xổ số miền bắc
-	Thread t2 = new Thread() {
-        public void run() {
-        	try {
-        		//System.out.println(this.getName());
-				scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-        }
-    };
- // Lấy danh sách dữ liệu kết quả xổ số miền trung
-	Thread t3 = new Thread() {
-        public void run() {
-        	//System.out.println(this.getName());
-        	scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
-        }
-    };
-    t1.start();
-    t2.start();
-    t3.start();
-    try {
-    	t1.join();
-        t2.join();
-        t3.join();
-    } catch (Exception e) {
-        System.out.println(e);
-    }
+		scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-nam/",date,"MN");
+		try {
+			scrappingMienBac("https://www.minhngoc.net.vn/doi-so-trung/mien-bac/",date);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		scrapping("https://www.minhngoc.net.vn/doi-so-trung/mien-trung/",date,"MT");
 
-
-//
-//    try {
-//        t3.join();
-//    } catch (Exception e) {
-//        System.out.println(e);
-//    }
 
 }
 public void getMultiDay() {
@@ -330,7 +344,7 @@ public void getMultiDay() {
 		System.out.println("Không tồn tại file Config");
 		return;
 	}
-	List<String> dates=getListDate("2012-01-10", "2012-01-11");
+	List<String> dates=getListDate("2022-11-16", "2022-11-21");
 	if(dates.size()==0) {
 		System.out.println("Start date have to more than End date !");
 		return ;
@@ -370,6 +384,7 @@ public void setSchedule() {
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException, CsvException, ParseException {
 		ScrappingKQXS sm = new ScrappingKQXS();
 		sm.getMultiDay();
+		//sm.updateAwardDimension();
 		//sm.createDateTable();
 		
 		// Lấy tất cả dữ liệu

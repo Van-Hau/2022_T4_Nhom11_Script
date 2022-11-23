@@ -3,9 +3,12 @@ package Config;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Properties;
@@ -47,8 +50,23 @@ public class Configuration {
     public static  String GET_DATE;
     public static  String SAVE_DATA;
     public static  String GETS_AREA;
+    public static  String GET_ALL_AREA;
+    public static  String GET_ALL_AWARD;
+    public static  String GET_ALL_PROVINCE;
     public static  String GET_AWARD;
     public static  String GET_PROVINCE;
+    public static  String IMPORT_PROVINCE_TO_STAGING;
+    public static  String IMPORT_PROVINCE_TO_DATAWAREHOUSE;
+    public static  String IMPORT_AREA_TO_STAGING;
+    public static  String IMPORT_AREA_TO_DATAWAREHOUSE;
+    public static  String IMPORT_AWARD_TO_STAGING;
+    public static  String IMPORT_AWARD_TO_DATAWAREHOUSE;
+    public static  String TRUNCATE_PROVINCE_STAGING;
+    public static  String TRUNCATE_AREA_STAGING;
+    public static  String TRUNCATE_AWARD_STAGING;
+    public static  String INSERT_AWARD;
+    public static  String INSERT_AREA;
+    public static  String INSERT_PROVINCE;
     FTPClient  ftpClient;
     public static int isExits=1;
     public static void printConfig() {
@@ -120,6 +138,21 @@ public class Configuration {
             GETS_AREA=properties.getProperty("GETS_AREA");
             GET_AWARD=properties.getProperty("GET_AWARD");
             GET_PROVINCE=properties.getProperty("GET_PROVINCE");
+            IMPORT_PROVINCE_TO_STAGING=properties.getProperty("IMPORT_PROVINCE_TO_STAGING");
+            IMPORT_PROVINCE_TO_DATAWAREHOUSE=properties.getProperty("IMPORT_PROVINCE_TO_DATAWAREHOUSE");
+            IMPORT_AREA_TO_STAGING=properties.getProperty("IMPORT_AREA_TO_STAGING");
+            IMPORT_AREA_TO_DATAWAREHOUSE=properties.getProperty("IMPORT_AREA_TO_DATAWAREHOUSE");
+            IMPORT_AWARD_TO_STAGING=properties.getProperty("IMPORT_AWARD_TO_STAGING");
+            IMPORT_AWARD_TO_DATAWAREHOUSE=properties.getProperty("IMPORT_AWARD_TO_DATAWAREHOUSE");
+            TRUNCATE_PROVINCE_STAGING=properties.getProperty("TRUNCATE_PROVINCE_STAGING");
+            TRUNCATE_AREA_STAGING=properties.getProperty("TRUNCATE_AREA_STAGING");
+            TRUNCATE_AWARD_STAGING=properties.getProperty("TRUNCATE_AWARD_STAGING");
+            INSERT_PROVINCE=properties.getProperty("INSERT_PROVINCE");
+            INSERT_AREA=properties.getProperty("INSERT_AREA");
+            INSERT_AWARD=properties.getProperty("INSERT_AWARD");
+            GET_ALL_AREA=properties.getProperty("GET_ALL_AREA");
+            GET_ALL_AWARD=properties.getProperty("GET_ALL_AWARD");
+            GET_ALL_PROVINCE=properties.getProperty("GET_ALL_PROVINCE");
         } catch (IOException e) {
             e.printStackTrace();
             System.out.println("Lỗi gì đó ở đây");
@@ -135,13 +168,26 @@ public class Configuration {
         }
     	return true;
     }
+    public static Date convertDate(String date) {
+    	java.util.Date parsed;
+		java.sql.Date sql;
+		SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy");
+		try {
+			parsed = format.parse(date);
+			sql = new java.sql.Date(parsed.getTime());
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			sql = new java.sql.Date(0000, 00, 00);
+		}
+		return sql;
+    }
 	public static String getID(Connection con) {
 		if(!ID_CONFIG.equals("")) return ID_CONFIG;
 		try {
 			PreparedStatement ps=con.prepareStatement("select ID from config where Source_Name=? AND Source_Local=? AND FTP=? AND user=? AND pass=?");
 			ps.setString(1, SOURCE_NAME);
 			ps.setString(2, PATH);
-			ps.setString(3, FTP);
+			ps.setString(3, FTP_SERVER_ADDRESS);
 			ps.setString(4, USER);
 			ps.setString(5, PASS);
 			ResultSet rs=ps.executeQuery();
@@ -155,7 +201,7 @@ public class Configuration {
 				ps.setString(1,id);
 				ps.setString(2, SOURCE_NAME);
 				ps.setString(3, PATH);
-				ps.setString(4, FTP);
+				ps.setString(4, FTP_SERVER_ADDRESS);
 				ps.setString(5, USER);
 				ps.setString(6, PASS);
 				int affect=ps.executeUpdate();

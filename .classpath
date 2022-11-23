@@ -13,5 +13,6 @@
 	<classpathentry kind="lib" path="libs/commons-net-3.6.jar" sourcepath="C:/Users/NGUYEN VAN HAU/.m2/repository/commons-net/commons-net/3.6/commons-net-3.6-sources.jar"/>
 	<classpathentry kind="lib" path="libs/c3p0-0.9.1.2.jar"/>
 	<classpathentry kind="lib" path="libs/mysql-connector-java-8.0.13.jar"/>
+	<classpathentry kind="lib" path="libs/tika-parsers-1.28.5.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
